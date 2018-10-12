@@ -1,7 +1,8 @@
 #include <jni.h>
 #include <string>
 #include "Misc.h"
-#include "YougaMediaPlayer.h"
+#include "media/YougaMediaPlayer.h"
+#include "android/YougaPlayerAndroid.h"
 
 #define JNI_YougaMediaPlayer     "youga/player/YougaMediaPlayer"
 
@@ -32,6 +33,24 @@ static int message_loop(void *arg) {
     return 0;
 }
 
+static YougaMediaPlayer *jni_set_media_player(JNIEnv* env, jobject thiz, YougaMediaPlayer *mp) {
+
+    YougaMediaPlayer *old = (YougaMediaPlayer*) (intptr_t) YougaMediaPlayer__mNativeMediaPlayer__get__catchAll(env, thiz);
+    if (mp) {
+        ijkmp_inc_ref(mp);
+    }
+    J4AC_IjkMediaPlayer__mNativeMediaPlayer__set__catchAll(env, thiz, (intptr_t) mp);
+
+    pthread_mutex_unlock(&g_clazz.mutex);
+
+    // NOTE: ijkmp_dec_ref may block thread
+    if (old != NULL ) {
+        ijkmp_dec_ref_p(&old);
+    }
+
+    return old;
+}
+
 static void YougaMediaPlayer_setVideoSurface(JNIEnv *env, jobject thiz, jobject jsurface) {
     LOGI("%s\n", __func__);
     YougaMediaPlayer *mp = jni_get_media_player(env, thiz);
@@ -51,7 +70,17 @@ static void YougaMediaPlayer_setDataSourceAndHeaders(
 
 static void YougaMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this) {
     LOGI("%s\n", __func__);
-    YougaMediaPlayer *mp = ijkmp_android_create(message_loop);
+    YougaMediaPlayer *mp = yougamp_android_create(message_loop);
+
+    jni_set_media_player(env, thiz, mp);
+    ijkmp_set_weak_thiz(mp, (*env)->NewGlobalRef(env, weak_this));
+    ijkmp_set_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
+    ijkmp_set_ijkio_inject_opaque(mp, ijkmp_get_weak_thiz(mp));
+    ijkmp_android_set_mediacodec_select_callback(mp, mediacodec_select_callback,
+                                                 ijkmp_get_weak_thiz(mp));
+
+    LABEL_RETURN:
+    ijkmp_dec_ref_p(&mp);
 }
 
 static void YougaMediaPlayer_native_init(JNIEnv *env) {
