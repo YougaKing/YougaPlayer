@@ -1,7 +1,6 @@
 #include <jni.h>
 #include <string>
-#include "misc.cpp"
-#include "alog.cpp"
+#include "Misc.h"
 #include "YougaMediaPlayer.h"
 
 #define JNI_YougaMediaPlayer     "youga/player/YougaMediaPlayer"
@@ -33,18 +32,26 @@ static int message_loop(void *arg) {
     return 0;
 }
 
-static void YougaMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this) {
+static void YougaMediaPlayer_setVideoSurface(JNIEnv *env, jobject thiz, jobject jsurface) {
     LOGI("%s\n", __func__);
-    YougaMediaPlayer *mp = ijkmp_android_create(message_loop);
+    YougaMediaPlayer *mp = jni_get_media_player(env, thiz);
+
+    return;
 }
+
 
 static void YougaMediaPlayer_setDataSourceAndHeaders(
         JNIEnv *env, jobject thiz, jstring path,
         jobjectArray keys, jobjectArray values) {
-    LOGI("%s\n", __func__);
+    LOGI("%s path=%s\n", __func__, jstringToChar(env, path));
     int retval = 0;
     const char *c_path = NULL;
     YougaMediaPlayer *mp = jni_get_media_player(env, thiz);
+}
+
+static void YougaMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this) {
+    LOGI("%s\n", __func__);
+    YougaMediaPlayer *mp = ijkmp_android_create(message_loop);
 }
 
 static void YougaMediaPlayer_native_init(JNIEnv *env) {
@@ -54,13 +61,14 @@ static void YougaMediaPlayer_native_init(JNIEnv *env) {
 // ----------------------------------------------------------------------------
 
 static JNINativeMethod g_nativeMethod[] = {
+        {"native_init",      "()V",                       (void *) YougaMediaPlayer_native_init},
+        {"native_setup",     "(Ljava/lang/Object;)V",     (void *) YougaMediaPlayer_native_setup},
         {
-                "_setDataSource",
-                                "(Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;)V",
-                                                         (void *) YougaMediaPlayer_setDataSourceAndHeaders
+         "_setDataSource",
+                             "(Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;)V",
+                                                          (void *) YougaMediaPlayer_setDataSourceAndHeaders
         },
-        {       "native_setup", "(Ljava/lang/Object;)V", (void *) YougaMediaPlayer_native_setup},
-        {       "native_init",  "()V",                   (void *) YougaMediaPlayer_native_init},
+        {"_setVideoSurface", "(Landroid/view/Surface;)V", (void *) YougaMediaPlayer_setVideoSurface},
 };
 
 /*
@@ -77,7 +85,7 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     assert(env != NULL);
 
     jclass jClass = env->FindClass(JNI_YougaMediaPlayer);
-    env->RegisterNatives(jClass, g_nativeMethod, NELEM(g_nativeMethod));
+    env->RegisterNatives(jClass, g_nativeMethod, GET_ARRAY_LEN(g_nativeMethod));
     env->DeleteLocalRef(jClass);
     return JNI_VERSION_1_6;
 }
