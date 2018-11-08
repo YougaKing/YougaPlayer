@@ -1,1 +1,1 @@
-include ':player', ':sample'
+include ':player', ':sample', ':mediaplayer'
